@@ -1,32 +1,42 @@
-name: Dinamik Servis CI Testi
+name: Dinamik Servis CI/CD Pipeline
 
 on:
   push:
     branches: [ "main" ]
 
 jobs:
-  test-ve-dogrula:
+  test-ve-dagit:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Depodaki kodları Actions sunucusuna çek
+      # 1. Kodu depodan çek
       - name: Kodu repodan cek
         uses: actions/checkout@v4
 
-      # 2. Docker imajını derle
+      # 2. Test amaçlı derle ve çalıştır
       - name: Docker imajini derle
         run: |
           docker build -t dinamik-app:test .
 
-      # 3. Konteynere özel ortam değişkeni vererek arka planda başlat
-      - name: Konteyneri calistir
+      - name: Konteyneri calistir ve test et
         run: |
           docker run -d -p 8080:8080 -e MESAJ="GitHub-Actions-Testi-Basarili" --name calisan-app dinamik-app:test
           sleep 3
-
-      # 4. Servise istek at ve dönen mesajı doğrula
-      - name: Servis ciktisini test et
-        run: |
           YANIT=$(curl -s http://localhost:8080)
           echo "Konteynerden Gelen Yanit: $YANIT"
           echo "$YANIT" | grep "GitHub-Actions-Testi-Basarili"
+
+      # 3. Test basariliysa Docker Hub'a giris yap (CD)
+      - name: Docker Hub Login
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      # 4. Imajı resmi formatta derle ve Docker Hub'a gonder
+      - name: Imajı derle ve Docker Hub'a pushla
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/dinamik-sistem-servisi:latest
